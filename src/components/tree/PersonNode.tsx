@@ -1,4 +1,4 @@
-import type { NodeProps } from '@xyflow/react'
+import { Handle, type NodeProps, Position } from '@xyflow/react'
 import type { Gender } from '@/api/core'
 
 type PersonNodeData = {
@@ -12,10 +12,31 @@ export default function PersonNode(props: NodeProps) {
   const data = props.data as PersonNodeData
   const ring = data.selectedA ? 'ring-2 ring-emerald-500' : data.selectedB ? 'ring-2 ring-lime-500' : ''
 
+  const theme =
+    data.gender === 'MALE'
+      ? 'border-sky-200 bg-white'
+      : data.gender === 'FEMALE'
+        ? 'border-fuchsia-200 bg-white'
+        : 'border-amber-200 bg-white'
+
+  const badgeColor =
+    data.gender === 'MALE'
+      ? 'bg-sky-500'
+      : data.gender === 'FEMALE'
+        ? 'bg-fuchsia-500'
+        : 'bg-amber-500'
+
   return (
-    <div className={`min-w-[140px] rounded-xl border bg-card px-3 py-2 shadow-sm ${ring}`}>
-      <div className="text-sm font-medium leading-tight">{data.label}</div>
-      <div className="mt-0.5 text-[11px] text-muted-foreground">{data.gender ?? 'UNKNOWN'}</div>
+    <div className={`min-w-[170px] rounded-xl border-2 px-4 py-3 shadow-md transition-shadow hover:shadow-lg ${theme} ${ring} relative`}>
+      <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
+      <Handle type="source" position={Position.Left} style={{ background: '#555' }} />
+      <Handle type="target" position={Position.Right} style={{ background: '#555' }} />
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-base font-semibold leading-tight text-gray-900">{data.label}</div>
+        <div className={`h-3 w-3 rounded-full ${badgeColor} flex-shrink-0 mt-0.5`} />
+      </div>
+      <div className="mt-2 text-xs text-gray-500 uppercase tracking-wide">{data.gender ?? 'UNKNOWN'}</div>
     </div>
   )
 }

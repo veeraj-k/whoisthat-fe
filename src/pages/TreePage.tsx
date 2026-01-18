@@ -1,32 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
-import {
-  Background,
-  Controls,
-  MiniMap,
-  ReactFlow,
-  type Edge,
-  type Node,
-  type OnNodesChange,
-  type OnEdgesChange,
-  type NodeTypes,
-  applyEdgeChanges,
-  applyNodeChanges,
-} from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   createPerson,
   createRelation,
   deletePersonById,
+  deleteRelationById,
   getAllPersons,
-  getAllRelations,
+  getRelationById,
   getSimplifiedRelationPath,
   type Gender,
   type PersonDto,
   type RelationDto,
   type RelationType,
+  updateRelationType,
   updatePerson,
 } from '@/api/core'
-import PersonNode from '@/components/tree/PersonNode'
+import FamilyChartView from '@/components/tree/FamilyChartView'
 
 type PersonFormState = {
   name: string
@@ -46,10 +34,6 @@ export default function TreePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [persons, setPersons] = useState<PersonDto[]>([])
-  const [relations, setRelations] = useState<RelationDto[]>([])
-
-  const [nodes, setNodes] = useState<Node[]>([])
-  const [edges, setEdges] = useState<Edge[]>([])
 
   const [activePersonId, setActivePersonId] = useState<string | null>(null)
   const [selectedA, setSelectedA] = useState<string | null>(null)
@@ -59,6 +43,8 @@ export default function TreePage() {
   const [decoderLoading, setDecoderLoading] = useState(false)
   const [decoderResult, setDecoderResult] = useState<string | null>(null)
   const [decoderError, setDecoderError] = useState<string | null>(null)
+
+  const lastDecodedKeyRef = useRef<string | null>(null)
 
   const [personFormMode, setPersonFormMode] = useState<'create' | 'edit'>('create')
   const [personForm, setPersonForm] = useState<PersonFormState>({ name: '', gender: 'UNKNOWN' })
@@ -73,7 +59,11 @@ export default function TreePage() {
   const [relationSaving, setRelationSaving] = useState(false)
   const [relationSaveError, setRelationSaveError] = useState<string | null>(null)
 
-  const nodeTypes = useMemo(() => ({ person: PersonNode }) as unknown as NodeTypes, [])
+  const [relationManageId, setRelationManageId] = useState('')
+  const [relationManageLoading, setRelationManageLoading] = useState(false)
+  const [relationManageError, setRelationManageError] = useState<string | null>(null)
+  const [relationManageData, setRelationManageData] = useState<RelationDto | null>(null)
+  const [relationManageType, setRelationManageType] = useState<RelationType>('SIBLING')
 
   const activePerson = useMemo(() => {
     if (!activePersonId) return null
@@ -84,9 +74,8 @@ export default function TreePage() {
     setError(null)
     setLoading(true)
     try {
-      const [p, r] = await Promise.all([getAllPersons(), getAllRelations()])
+      const p = await getAllPersons()
       setPersons(p)
-      setRelations(r)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data')
     } finally {
@@ -99,76 +88,53 @@ export default function TreePage() {
   }, [])
 
   useEffect(() => {
-    const filtered = persons.filter((p) => p.id != null)
-    const count = filtered.length
-    const radius = Math.max(240, count * 22)
+    async function run() {
+      if (!selectedA || !selectedB) return
 
-    const nextNodes: Node[] = filtered.map((p, idx) => {
-      const id = String(p.id)
-      const angle = (Math.PI * 2 * idx) / Math.max(1, count)
-      const x = Math.cos(angle) * radius
-      const y = Math.sin(angle) * radius
+      const key = `${selectedA}|${selectedB}|${decoderLang}`
+      if (lastDecodedKeyRef.current === key) return
+      lastDecodedKeyRef.current = key
 
-      return {
-        id,
-        type: 'person',
-        position: { x, y },
-        data: {
-          label: p.name ?? `Person ${id}`,
-          gender: p.gender,
-          selectedA: selectedA === id,
-          selectedB: selectedB === id,
-        },
+      setDecoderError(null)
+      setDecoderResult(null)
+      setDecoderLoading(true)
+      try {
+        const result = await getSimplifiedRelationPath({
+          from: Number(selectedA),
+          to: Number(selectedB),
+          lang: decoderLang,
+        })
+        setDecoderResult(result)
+      } catch (err) {
+        setDecoderError(err instanceof Error ? err.message : 'Failed to decode relation')
+      } finally {
+        setDecoderLoading(false)
       }
-    })
-
-    const nextEdges: Edge[] = []
-    for (let idx = 0; idx < relations.length; idx += 1) {
-      const rel = relations[idx]
-      const fromId = rel.fromPerson?.id
-      const toId = rel.toPerson?.id
-      if (fromId == null || toId == null) continue
-
-      const id = `${fromId}-${toId}-${rel.relationType ?? 'REL'}-${idx}`
-      nextEdges.push({
-        id,
-        source: String(fromId),
-        target: String(toId),
-        label: rel.relationType ?? undefined,
-        animated: rel.relationType === 'SPOUSE',
-        style: {
-          strokeWidth: 2,
-        },
-      })
     }
 
-    setNodes(nextNodes)
-    setEdges(nextEdges)
-  }, [persons, relations, selectedA, selectedB])
+    void run()
+  }, [decoderLang, selectedA, selectedB])
 
-  const onNodesChange: OnNodesChange = (changes) => setNodes((nds) => applyNodeChanges(changes, nds))
-  const onEdgesChange: OnEdgesChange = (changes) => setEdges((eds) => applyEdgeChanges(changes, eds))
+  function onPersonPick(personId: string) {
+    setActivePersonId(personId)
 
-  function onNodeClick(_: unknown, node: Node) {
-    setActivePersonId(node.id)
-
-    if (!selectedA || selectedA === node.id) {
-      setSelectedA(node.id)
-      if (selectedA === node.id) setSelectedA(null)
+    if (!selectedA || selectedA === personId) {
+      setSelectedA(personId)
+      if (selectedA === personId) setSelectedA(null)
       setDecoderResult(null)
       setDecoderError(null)
       return
     }
 
-    if (!selectedB || selectedB === node.id) {
-      setSelectedB(node.id)
-      if (selectedB === node.id) setSelectedB(null)
+    if (!selectedB || selectedB === personId) {
+      setSelectedB(personId)
+      if (selectedB === personId) setSelectedB(null)
       setDecoderResult(null)
       setDecoderError(null)
       return
     }
 
-    setSelectedA(node.id)
+    setSelectedA(personId)
     setSelectedB(null)
     setDecoderResult(null)
     setDecoderError(null)
@@ -248,6 +214,66 @@ export default function TreePage() {
     }
   }
 
+  async function fetchRelationById() {
+    setRelationManageError(null)
+    setRelationManageData(null)
+    if (!relationManageId) {
+      setRelationManageError('Enter a relation id')
+      return
+    }
+
+    setRelationManageLoading(true)
+    try {
+      const res = await getRelationById(Number(relationManageId))
+      setRelationManageData(res)
+      if (res.relationType) {
+        setRelationManageType(res.relationType)
+      }
+    } catch (err) {
+      setRelationManageError(err instanceof Error ? err.message : 'Failed to fetch relation')
+    } finally {
+      setRelationManageLoading(false)
+    }
+  }
+
+  async function updateRelation() {
+    setRelationManageError(null)
+    if (!relationManageId) {
+      setRelationManageError('Enter a relation id')
+      return
+    }
+
+    setRelationManageLoading(true)
+    try {
+      const res = await updateRelationType(Number(relationManageId), relationManageType)
+      setRelationManageData(res)
+      await load()
+    } catch (err) {
+      setRelationManageError(err instanceof Error ? err.message : 'Failed to update relation')
+    } finally {
+      setRelationManageLoading(false)
+    }
+  }
+
+  async function removeRelation() {
+    setRelationManageError(null)
+    if (!relationManageId) {
+      setRelationManageError('Enter a relation id')
+      return
+    }
+
+    setRelationManageLoading(true)
+    try {
+      await deleteRelationById(Number(relationManageId))
+      setRelationManageData(null)
+      await load()
+    } catch (err) {
+      setRelationManageError(err instanceof Error ? err.message : 'Failed to delete relation')
+    } finally {
+      setRelationManageLoading(false)
+    }
+  }
+
   async function decode() {
     setDecoderError(null)
     setDecoderResult(null)
@@ -272,8 +298,11 @@ export default function TreePage() {
   }
 
   return (
-    <div className="h-[calc(100vh-56px)] grid grid-cols-1 lg:grid-cols-[1fr_380px]">
-      <div className="relative">
+    <div className="min-h-[calc(100dvh-56px)] lg:h-[calc(100dvh-56px)] grid grid-cols-1 lg:grid-cols-[1fr_380px]">
+      <div className="relative h-full min-h-[400px]">
+        <div className="absolute top-3 left-3 z-10 rounded-md border bg-card/80 backdrop-blur px-2 py-1 text-xs text-muted-foreground">
+          People: {persons.filter((p) => p.id != null).length}
+        </div>
         {loading ? (
           <div className="h-full grid place-items-center text-sm text-muted-foreground">Loading…</div>
         ) : error ? (
@@ -301,19 +330,12 @@ export default function TreePage() {
             </div>
           </div>
         ) : (
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            nodeTypes={nodeTypes}
-            onNodeClick={onNodeClick}
-            fitView
-          >
-            <Background />
-            <MiniMap pannable zoomable />
-            <Controls />
-          </ReactFlow>
+          <FamilyChartView
+            persons={persons}
+            selectedA={selectedA}
+            selectedB={selectedB}
+            onPersonClick={onPersonPick}
+          />
         )}
       </div>
 
@@ -321,9 +343,14 @@ export default function TreePage() {
         <div className="h-full overflow-auto p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-sm font-semibold">Tools</div>
-            <button className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent" onClick={startCreatePerson}>
-              New person
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+                onClick={startCreatePerson}
+              >
+                New person
+              </button>
+            </div>
           </div>
 
           <div className="rounded-xl border bg-card p-4">
@@ -471,6 +498,75 @@ export default function TreePage() {
               >
                 {relationSaving ? 'Creating…' : 'Create relationship'}
               </button>
+            </div>
+          </div>
+
+          <div className="rounded-xl border bg-card p-4">
+            <div className="text-sm font-medium">Manage relationship (by ID)</div>
+            <div className="mt-2 text-xs text-muted-foreground">
+              Swagger relation list doesn’t include an ID, so manage updates/deletes by providing the relation id.
+            </div>
+
+            <div className="mt-3 grid gap-3">
+              <div className="grid gap-1">
+                <label className="text-xs text-muted-foreground">Relation ID</label>
+                <input
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  value={relationManageId}
+                  onChange={(e) => setRelationManageId(e.target.value)}
+                />
+              </div>
+
+              <button
+                className="w-full rounded-md border px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
+                disabled={relationManageLoading}
+                onClick={() => void fetchRelationById()}
+              >
+                {relationManageLoading ? 'Loading…' : 'Fetch relation'}
+              </button>
+
+              {relationManageData ? (
+                <div className="rounded-md border bg-background px-3 py-2 text-xs">
+                  <div className="font-medium">
+                    {relationManageData.fromPerson?.name ?? 'Unknown'} → {relationManageData.toPerson?.name ?? 'Unknown'}
+                  </div>
+                  <div className="text-muted-foreground">Current: {relationManageData.relationType ?? 'UNKNOWN'}</div>
+                </div>
+              ) : null}
+
+              <div className="grid gap-1">
+                <label className="text-xs text-muted-foreground">Update type</label>
+                <select
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  value={relationManageType}
+                  onChange={(e) => setRelationManageType(e.target.value as RelationType)}
+                >
+                  {relationTypeOptions.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  className="flex-1 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm disabled:opacity-50"
+                  disabled={relationManageLoading}
+                  onClick={() => void updateRelation()}
+                >
+                  Update
+                </button>
+                <button
+                  className="rounded-md border px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
+                  disabled={relationManageLoading}
+                  onClick={() => void removeRelation()}
+                >
+                  Delete
+                </button>
+              </div>
+
+              {relationManageError ? <div className="text-sm text-destructive">{relationManageError}</div> : null}
             </div>
           </div>
 

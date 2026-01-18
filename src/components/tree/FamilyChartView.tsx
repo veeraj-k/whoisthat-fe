@@ -1,0 +1,352 @@
+import { useEffect, useMemo, useState } from 'react'
+import type React from 'react'
+import {
+  Background,
+  Controls,
+  MiniMap,
+  ReactFlow,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  type NodeMouseHandler,
+  type Edge,
+  type Node,
+  type OnNodesChange,
+  type OnEdgesChange,
+  type NodeTypes,
+  type EdgeProps,
+  applyEdgeChanges,
+  applyNodeChanges,
+} from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
+import * as dagre from 'dagre'
+import type { PersonDto } from '@/api/core'
+import PersonNode from './PersonNode'
+
+// Custom edge component that properly renders edges with labels
+function CustomEdge(props: EdgeProps) {
+  const {
+    id,
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    style = {},
+    label,
+    labelStyle,
+    labelBgStyle,
+    markerEnd,
+  } = props
+
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  })
+
+  // Ensure minimum visibility with explicit styles
+  const edgeStyle: React.CSSProperties = {
+    stroke: (style as any)?.stroke || '#000000',
+    strokeWidth: (style as any)?.strokeWidth || 4,
+    strokeDasharray: (style as any)?.strokeDasharray,
+    fill: 'none',
+    opacity: 1,
+    pointerEvents: 'stroke' as const,
+  }
+
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        markerEnd={markerEnd as string | undefined}
+        style={edgeStyle}
+      />
+      {label && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              fontSize: labelStyle?.fontSize || 10,
+              pointerEvents: 'all',
+              zIndex: 1000,
+            }}
+            className="nodrag nopan"
+          >
+            <div
+              style={{
+                padding: '2px 6px',
+                borderRadius: '4px',
+                backgroundColor: labelBgStyle?.fill || '#ffffff',
+                border: `1px solid ${labelBgStyle?.stroke || '#ccc'}`,
+                color: labelStyle?.fill || '#000',
+                fontSize: labelStyle?.fontSize || 10,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {label}
+            </div>
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  )
+}
+
+// Define edgeTypes outside component to ensure it's stable
+const edgeTypes = {
+  custom: CustomEdge,
+}
+
+type Props = {
+  persons: PersonDto[]
+  selectedA: string | null
+  selectedB: string | null
+  onPersonClick: (personId: string) => void
+}
+
+function getRelationStroke(type?: string): {
+  stroke: string
+  strokeDasharray?: string
+  animated?: boolean
+  strokeWidth?: number
+} {
+  if (type === 'PARENT') return { stroke: '#10b981', strokeWidth: 3 }
+  if (type === 'SIBLING') return { stroke: '#6366f1', strokeDasharray: '6 6', strokeWidth: 3 }
+  if (type === 'SPOUSE') return { stroke: '#ec4899', animated: true, strokeWidth: 3 }
+  return { stroke: '#94a3b8', strokeWidth: 3 }
+}
+
+function layoutTree(nodes: Node[], edges: Edge[]): Node[] {
+  const g = new dagre.graphlib.Graph()
+  g.setDefaultEdgeLabel(() => ({}))
+  g.setGraph({
+    rankdir: 'TB',
+    nodesep: 120,
+    ranksep: 140,
+  })
+
+  const nodeWidth = 180
+  const nodeHeight = 80
+
+  for (const n of nodes) {
+    g.setNode(n.id, { width: nodeWidth, height: nodeHeight })
+  }
+  for (const e of edges) {
+    g.setEdge(e.source, e.target)
+  }
+
+  dagre.layout(g)
+
+  return nodes.map((n) => {
+    const pos = g.node(n.id) as { x: number; y: number } | undefined
+    if (!pos) return n
+    return {
+      ...n,
+      position: {
+        x: pos.x - nodeWidth / 2,
+        y: pos.y - nodeHeight / 2,
+      },
+    }
+  })
+}
+
+export default function FamilyChartView({ persons, selectedA, selectedB, onPersonClick }: Props) {
+  const [nodes, setNodes] = useState<Node[]>([])
+  const [edges, setEdges] = useState<Edge[]>([])
+
+  const nodeTypes = useMemo(() => ({ person: PersonNode }) as unknown as NodeTypes, [])
+
+  useEffect(() => {
+    const parentsMap = new Map<string, Set<string>>()
+    const spousesMap = new Map<string, Set<string>>()
+    const childrenMap = new Map<string, Set<string>>()
+
+    for (const person of persons) {
+      if (person.id == null) continue
+      const pid = String(person.id)
+
+      for (const rel of person.relations ?? []) {
+        const otherId = rel.person?.id
+        const type = rel.relationType
+        if (otherId == null || !type) continue
+
+        const other = String(otherId)
+
+        if (type === 'PARENT') {
+          // other is parent of person
+          pushUnique(parentsMap, pid, other)
+          pushUnique(childrenMap, other, pid)
+        } else if (type === 'SPOUSE') {
+          pushUnique(spousesMap, pid, other)
+          pushUnique(spousesMap, other, pid)
+        }
+      }
+    }
+
+    const baseNodes: Node[] = persons
+      .filter((p) => p.id != null)
+      .map((p) => {
+        const id = String(p.id)
+        return {
+          id,
+          type: 'person',
+          position: { x: 0, y: 0 },
+          data: {
+            label: p.name ?? `Person ${id}`,
+            gender: p.gender,
+            selectedA: selectedA === id,
+            selectedB: selectedB === id,
+          },
+        }
+      })
+
+    // Create a set of valid node IDs to ensure edges only connect to existing nodes
+    const validNodeIds = new Set(baseNodes.map((n) => n.id))
+
+    const nextEdges: Edge[] = []
+    for (const person of persons) {
+      if (person.id == null) continue
+      const pid = String(person.id)
+      if (!validNodeIds.has(pid)) continue
+
+      const parents = parentsMap.get(pid)
+      const spouses = spousesMap.get(pid)
+
+      if (parents) {
+        for (const parent of parents) {
+          if (!validNodeIds.has(parent)) continue
+          const theme = getRelationStroke('PARENT')
+          nextEdges.push({
+            id: `${parent}-${pid}-PARENT`,
+            source: parent,
+            target: pid,
+            type: 'custom',
+            label: 'PARENT',
+            labelStyle: { fontSize: 10, fill: '#10b981' },
+            labelBgStyle: { fill: '#ffffff', stroke: '#10b981', strokeWidth: 1 },
+            animated: theme.animated ?? false,
+            style: {
+              stroke: theme.stroke,
+              strokeWidth: theme.strokeWidth ?? 3,
+              strokeDasharray: theme.strokeDasharray,
+            },
+            markerEnd: 'arrowclosed',
+          })
+        }
+      }
+
+      if (spouses) {
+        for (const spouse of spouses) {
+          if (!validNodeIds.has(spouse)) continue
+          // Only create edge once per pair (use sorted IDs to avoid duplicates)
+          const edgeId = [pid, spouse].sort().join('-') + '-SPOUSE'
+          if (nextEdges.some((e) => e.id === edgeId)) continue
+          
+          const theme = getRelationStroke('SPOUSE')
+          nextEdges.push({
+            id: edgeId,
+            source: pid,
+            target: spouse,
+            type: 'custom',
+            label: 'SPOUSE',
+            labelStyle: { fontSize: 10, fill: '#ec4899' },
+            labelBgStyle: { fill: '#ffffff', stroke: '#ec4899', strokeWidth: 1 },
+            animated: theme.animated ?? false,
+            style: {
+              stroke: theme.stroke,
+              strokeWidth: theme.strokeWidth ?? 3,
+              strokeDasharray: theme.strokeDasharray,
+            },
+            markerEnd: 'arrowclosed',
+          })
+        }
+      }
+    }
+
+    // Add sibling edges for visual connection (optional)
+    for (const person of persons) {
+      if (person.id == null) continue
+      const pid = String(person.id)
+      if (!validNodeIds.has(pid)) continue
+
+      for (const rel of person.relations ?? []) {
+        if (rel.relationType !== 'SIBLING' || rel.person?.id == null) continue
+        const other = String(rel.person.id)
+        if (!validNodeIds.has(other)) continue
+        
+        const theme = getRelationStroke('SIBLING')
+        // Use sorted IDs to avoid duplicates
+        const sortedIds = [pid, other].sort()
+        const edgeId = `${sortedIds[0]}-${sortedIds[1]}-SIBLING`
+        // Avoid duplicate edges
+        if (!nextEdges.some((e) => e.id === edgeId)) {
+          nextEdges.push({
+            id: edgeId,
+            source: pid,
+            target: other,
+            type: 'custom',
+            label: 'SIBLING',
+            labelStyle: { fontSize: 10, fill: '#6366f1' },
+            labelBgStyle: { fill: '#ffffff', stroke: '#6366f1', strokeWidth: 1 },
+            animated: theme.animated ?? false,
+            style: {
+              stroke: theme.stroke,
+              strokeWidth: theme.strokeWidth ?? 3,
+              strokeDasharray: theme.strokeDasharray,
+            },
+            markerEnd: 'arrowclosed',
+          })
+        }
+      }
+    }
+
+    console.log('Nodes:', baseNodes.length, 'Edges:', nextEdges.length, nextEdges)
+
+    const laidOutNodes = layoutTree(baseNodes, nextEdges)
+    setNodes(laidOutNodes)
+    setEdges(nextEdges)
+  }, [persons, selectedA, selectedB])
+
+  const onNodesChange: OnNodesChange = (changes) => setNodes((nds) => applyNodeChanges(changes, nds))
+  const onEdgesChange: OnEdgesChange = (changes) => setEdges((eds) => applyEdgeChanges(changes, eds))
+
+  const onNodeClick: NodeMouseHandler = (_, node) => {
+    onPersonClick(node.id)
+  }
+
+  return (
+    <div className="w-full h-full" style={{ width: '100%', height: '100%', minHeight: '400px' }}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        onNodeClick={onNodeClick}
+        fitView
+        defaultEdgeOptions={{
+          animated: false,
+        }}
+        style={{ background: '#fafafa', width: '100%', height: '100%' }}
+      >
+        <Background />
+        <MiniMap pannable zoomable />
+        <Controls />
+      </ReactFlow>
+    </div>
+  )
+}
+
+function pushUnique(map: Map<string, Set<string>>, key: string, value: string) {
+  const set = map.get(key) ?? new Set<string>()
+  set.add(value)
+  map.set(key, set)
+}

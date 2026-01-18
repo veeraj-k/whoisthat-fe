@@ -3,6 +3,7 @@ import { ProtectedRoute } from '@/auth/ProtectedRoute'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 import AppShell from '@/pages/AppShell'
+import RelationsSummaryPage from '@/pages/RelationsSummaryPage'
 import TreePage from '@/pages/TreePage'
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
           <Route path="/" element={<TreePage />} />
+          <Route path="/relations" element={<RelationsSummaryPage />} />
         </Route>
       </Route>
 
