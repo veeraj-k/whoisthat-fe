@@ -10,6 +10,9 @@ import {
   updatePerson,
   deletePersonById,
   createPerson,
+  createRelation,
+  type RelationType,
+  type PostRelationDto,
 } from '@/api/core'
 import FamilyChartView from '@/components/tree/FamilyChartView'
 
@@ -19,6 +22,11 @@ type PersonFormState = {
 }
 
 const genderOptions: Gender[] = ['MALE', 'FEMALE', 'UNKNOWN']
+const relationTypeOptions: RelationType[] = ['PARENT', 'SIBLING', 'SPOUSE']
+const languageOptions = [
+  { value: 'kannada', label: 'Kannada' },
+  { value: 'tulu', label: 'Tulu' },
+]
 
 export default function TreePage() {
   const [loading, setLoading] = useState(true)
@@ -37,9 +45,18 @@ export default function TreePage() {
   const lastDecodedKeyRef = useRef<string | null>(null)
 
   const [personFormMode, setPersonFormMode] = useState<'create' | 'edit'>('create')
-  const [personForm, setPersonForm] = useState<PersonFormState>({ name: '', gender: 'UNKNOWN' })
+  const [personForm, setPersonForm] = useState<PersonFormState>({ name: '', gender: 'MALE' })
   const [personSaving, setPersonSaving] = useState(false)
   const [personSaveError, setPersonSaveError] = useState<string | null>(null)
+
+  // Relation creation state
+  const [relationForm, setRelationForm] = useState<PostRelationDto>({
+    fromId: undefined,
+    toId: undefined,
+    relationType: 'PARENT',
+  })
+  const [relationSaving, setRelationSaving] = useState(false)
+  const [relationSaveError, setRelationSaveError] = useState<string | null>(null)
 
   async function load() {
     setError(null)
@@ -130,7 +147,7 @@ export default function TreePage() {
 
   function startCreatePerson() {
     setPersonFormMode('create')
-    setPersonForm({ name: '', gender: 'UNKNOWN' })
+    setPersonForm({ name: '', gender: 'MALE' })
     setPersonSaveError(null)
     setActivePersonId(null)
   }
@@ -167,6 +184,30 @@ export default function TreePage() {
       setPersonSaveError(err instanceof Error ? err.message : 'Failed to delete person')
     } finally {
       setPersonSaving(false)
+    }
+  }
+
+  async function submitRelation() {
+    if (!relationForm.fromId || !relationForm.toId) {
+      setRelationSaveError('Please select both Person A and Person B')
+      return
+    }
+    if (relationForm.fromId === relationForm.toId) {
+      setRelationSaveError('Person A and Person B cannot be the same')
+      return
+    }
+
+    setRelationSaveError(null)
+    setRelationSaving(true)
+    try {
+      await createRelation(relationForm)
+      setRelationForm({ fromId: undefined, toId: undefined, relationType: 'PARENT' })
+      await load()
+      toast.success('Relation created successfully')
+    } catch (err) {
+      setRelationSaveError(err instanceof Error ? err.message : 'Failed to create relation')
+    } finally {
+      setRelationSaving(false)
     }
   }
 
@@ -298,31 +339,121 @@ export default function TreePage() {
              </div>
         </div>
 
+        <div className="rounded-xl border bg-card p-4">
+          <div className="text-sm font-medium">Add Relation</div>
+          <div className="mt-3 space-y-3">
+            <div className="grid gap-1">
+              <label className="text-xs text-muted-foreground">Person A</label>
+              <select
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={relationForm.fromId ?? ''}
+                onChange={(e) => setRelationForm((s) => ({ ...s, fromId: e.target.value ? Number(e.target.value) : undefined }))}
+              >
+                <option value="">Select person</option>
+                {persons.filter((p) => p.id != null).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name ?? `Person ${p.id}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-1">
+              <label className="text-xs text-muted-foreground">Person B</label>
+              <select
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={relationForm.toId ?? ''}
+                onChange={(e) => setRelationForm((s) => ({ ...s, toId: e.target.value ? Number(e.target.value) : undefined }))}
+              >
+                <option value="">Select person</option>
+                {persons.filter((p) => p.id != null).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name ?? `Person ${p.id}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-1">
+              <label className="text-xs text-muted-foreground">Relation Type</label>
+              <select
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={relationForm.relationType}
+                onChange={(e) => setRelationForm((s) => ({ ...s, relationType: e.target.value as RelationType }))}
+              >
+                {relationTypeOptions.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {relationSaveError ? <div className="text-sm text-destructive">{relationSaveError}</div> : null}
+
+            <button
+              className="w-full rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm disabled:opacity-50"
+              disabled={relationSaving}
+              onClick={() => void submitRelation()}
+            >
+              {relationSaving ? 'Creating…' : 'Create Relation'}
+            </button>
+          </div>
+        </div>
+
           <div className="rounded-xl border bg-card p-4">
             <div className="text-sm font-medium">Relationship decoder</div>
             <div className="mt-2 text-xs text-muted-foreground">
-              Click two people in the tree to select A and B.
+              Select Person A and Person B from the dropdowns to decode their relationship.
             </div>
 
             <div className="mt-3 space-y-3">
               <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-md border bg-background px-3 py-2">
-                  <div className="text-[11px] text-muted-foreground">A</div>
-                  <div className="text-sm font-medium truncate">{selectedA ?? '—'}</div>
+                <div className="grid gap-1">
+                  <label className="text-xs text-muted-foreground">Person A</label>
+                  <select
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={selectedA ?? ''}
+                    onChange={(e) => setSelectedA(e.target.value || null)}
+                  >
+                    <option value="">Select person</option>
+                    {persons.filter((p) => p.id != null).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name ?? `Person ${p.id}`}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div className="rounded-md border bg-background px-3 py-2">
-                  <div className="text-[11px] text-muted-foreground">B</div>
-                  <div className="text-sm font-medium truncate">{selectedB ?? '—'}</div>
+                <div className="grid gap-1">
+                  <label className="text-xs text-muted-foreground">Person B</label>
+                  <select
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={selectedB ?? ''}
+                    onChange={(e) => setSelectedB(e.target.value || null)}
+                  >
+                    <option value="">Select person</option>
+                    {persons.filter((p) => p.id != null).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name ?? `Person ${p.id}`}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
               <div className="grid gap-1">
                 <label className="text-xs text-muted-foreground">Language</label>
-                <input
+                <select
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                   value={decoderLang}
                   onChange={(e) => setDecoderLang(e.target.value)}
-                />
+                >
+                  {languageOptions.map((lang) => (
+                    <option key={lang.value} value={lang.value}>
+                      {lang.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <button
