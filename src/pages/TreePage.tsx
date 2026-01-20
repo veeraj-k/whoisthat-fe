@@ -58,6 +58,9 @@ export default function TreePage() {
   const [relationSaving, setRelationSaving] = useState(false)
   const [relationSaveError, setRelationSaveError] = useState<string | null>(null)
 
+  // Mobile sidebar state
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+
   async function load() {
     setError(null)
     setLoading(true)
@@ -236,6 +239,24 @@ export default function TreePage() {
 
   return (
     <div className="min-h-[calc(100dvh-56px)] lg:h-[calc(100dvh-56px)] grid grid-cols-1 lg:grid-cols-[1fr_380px]">
+      {/* Mobile sidebar toggle button */}
+      <button
+        className="lg:hidden fixed top-4 right-4 z-20 rounded-md border bg-card/80 backdrop-blur p-2 shadow-md"
+        onClick={() => setMobileSidebarOpen(true)}
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {/* Mobile sidebar overlay */}
+      {mobileSidebarOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
       <div className="relative h-full min-h-[400px]">
         <div className="absolute top-3 left-3 z-10 rounded-md border bg-card/80 backdrop-blur px-2 py-1 text-xs text-muted-foreground">
           People: {persons.filter((p) => p.id != null).length}
@@ -276,11 +297,22 @@ export default function TreePage() {
       )}
       </div>
 
-    <aside className="border-t lg:border-t-0 lg:border-l bg-card/30">
+    <aside className={`fixed lg:relative top-0 right-0 h-full w-80 max-w-[90vw] bg-background border-l border-gray-200 z-40 transform transition-transform duration-300 ease-in-out ${
+      mobileSidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
+    }`}>
       <div className="h-full overflow-auto p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold">Tools</div>
           <div className="flex items-center gap-2">
+            {/* Mobile close button */}
+            <button
+              className="lg:hidden rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+              onClick={() => setMobileSidebarOpen(false)}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
             <button
               className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
               onClick={startCreatePerson}
