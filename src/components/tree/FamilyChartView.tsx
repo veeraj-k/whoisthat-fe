@@ -128,8 +128,8 @@ function layoutTree(nodes: Node[], edges: Edge[]): Node[] {
   g.setDefaultEdgeLabel(() => ({}))
   g.setGraph({
     rankdir: 'TB',
-    nodesep: 120,
-    ranksep: 140,
+    nodesep: 200,
+    ranksep: 180,
   })
 
   const nodeWidth = 180
@@ -167,6 +167,7 @@ export default function FamilyChartView({ persons, selectedA, selectedB, onPerso
     const parentsMap = new Map<string, Set<string>>()
     const spousesMap = new Map<string, Set<string>>()
     const childrenMap = new Map<string, Set<string>>()
+    const siblingsMap = new Map<string, Set<string>>()
 
     for (const person of persons) {
       if (person.id == null) continue
@@ -180,12 +181,16 @@ export default function FamilyChartView({ persons, selectedA, selectedB, onPerso
         const other = String(otherId)
 
         if (type === 'PARENT') {
-          // other is parent of person
-          pushUnique(parentsMap, pid, other)
-          pushUnique(childrenMap, other, pid)
+          // person is parent of other
+          pushUnique(childrenMap, pid, other)
+          pushUnique(parentsMap, other, pid)
         } else if (type === 'SPOUSE') {
           pushUnique(spousesMap, pid, other)
           pushUnique(spousesMap, other, pid)
+        } else if (type === 'SIBLING') {
+          // siblings are bidirectional
+          pushUnique(siblingsMap, pid, other)
+          pushUnique(siblingsMap, other, pid)
         }
       }
     }
@@ -271,26 +276,24 @@ export default function FamilyChartView({ persons, selectedA, selectedB, onPerso
     }
 
     // Add sibling edges for visual connection (optional)
+    const addedSiblingPairs = new Set<string>()
     for (const person of persons) {
       if (person.id == null) continue
       const pid = String(person.id)
-      if (!validNodeIds.has(pid)) continue
+      const siblings = siblingsMap.get(pid)
 
-      for (const rel of person.relations ?? []) {
-        if (rel.relationType !== 'SIBLING' || rel.person?.id == null) continue
-        const other = String(rel.person.id)
-        if (!validNodeIds.has(other)) continue
-        
-        const theme = getRelationStroke('SIBLING')
-        // Use sorted IDs to avoid duplicates
-        const sortedIds = [pid, other].sort()
-        const edgeId = `${sortedIds[0]}-${sortedIds[1]}-SIBLING`
-        // Avoid duplicate edges
-        if (!nextEdges.some((e) => e.id === edgeId)) {
+      if (siblings) {
+        for (const sibling of siblings) {
+          const pairKey = [pid, sibling].sort().join('-')
+          if (addedSiblingPairs.has(pairKey)) continue
+          addedSiblingPairs.add(pairKey)
+
+          const theme = getRelationStroke('SIBLING')
+          const edgeId = `${pid}-${sibling}-SIBLING`
           nextEdges.push({
             id: edgeId,
             source: pid,
-            target: other,
+            target: sibling,
             type: 'custom',
             label: 'SIBLING',
             labelStyle: { fontSize: 10, fill: '#6366f1' },
@@ -298,10 +301,9 @@ export default function FamilyChartView({ persons, selectedA, selectedB, onPerso
             animated: theme.animated ?? false,
             style: {
               stroke: theme.stroke,
-              strokeWidth: theme.strokeWidth ?? 3,
+              strokeWidth: theme.strokeWidth ?? 6,
               strokeDasharray: theme.strokeDasharray,
             },
-            markerEnd: 'arrowclosed',
           })
         }
       }

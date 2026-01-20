@@ -1,0 +1,32 @@
+/* Custom toast styles for react-toastify */
+.toast-container {
+  top: 80px;
+}
+
+.toast-item {
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  padding: 16px 20px;
+  min-height: 56px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.toast-item.Toastify__toast--success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border-color: #10b981;
+}
+
+.toast-item.Toastify__toast--error {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border-color: #ef4444;
+}
+
+.toast-item.Toastify__progress-bar {
+  background: rgba(255, 255, 255, 0.3);
+}
