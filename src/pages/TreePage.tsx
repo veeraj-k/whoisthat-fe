@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ToastContainer, toast } from 'react-toastify'
+import { ToastContainer, Zoom, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import './TreePage.css'
 import {
@@ -407,7 +407,10 @@ export default function TreePage() {
       </Button>
     </PopoverTrigger>
 
-    <PopoverContent className="w-full p-0">
+    <PopoverContent side="bottom"
+  align="start"
+  sideOffset={4}
+  className="w-full p-0">
       <Command>
         <CommandInput placeholder="Search person..." />
         <CommandEmpty>No person found.</CommandEmpty>
@@ -454,7 +457,10 @@ export default function TreePage() {
       </Button>
     </PopoverTrigger>
 
-    <PopoverContent className="w-full p-0">
+    <PopoverContent side="bottom"
+  align="start"
+  sideOffset={4}
+  className="w-full p-0">
       <Command>
         <CommandInput placeholder="Search person..." />
         <CommandEmpty>No person found.</CommandEmpty>
@@ -530,7 +536,10 @@ export default function TreePage() {
     </Button>
   </PopoverTrigger>
 
-  <PopoverContent className="w-full p-0">
+  <PopoverContent side="bottom"
+  align="start"
+  sideOffset={4}
+  className="w-full p-0">
     <Command>
       <CommandInput placeholder="Search person..." />
       <CommandEmpty>No person found.</CommandEmpty>
@@ -569,7 +578,10 @@ export default function TreePage() {
     </Button>
   </PopoverTrigger>
 
-  <PopoverContent className="w-full p-0">
+  <PopoverContent side="bottom"
+  align="start"
+  sideOffset={4}
+  className="w-full p-0">
     <Command>
       <CommandInput placeholder="Search person..." />
       <CommandEmpty>No person found.</CommandEmpty>
@@ -632,12 +644,13 @@ export default function TreePage() {
       <ToastContainer
         position="top-center"
         autoClose={5000}
-        hideProgressBar={false}
+        transition={Zoom}
+        hideProgressBar={true}
         newestOnTop={false}
         closeOnClick
         rtl={false}
         pauseOnFocusLoss
-        draggable
+        draggable={true}
         pauseOnHover
         theme="light"
         className="toast-container"
