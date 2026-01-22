@@ -3,7 +3,6 @@ import type React from 'react'
 import {
   Background,
   Controls,
-  MiniMap,
   ReactFlow,
   BaseEdge,
   EdgeLabelRenderer,
