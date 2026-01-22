@@ -325,6 +325,10 @@ export default function FamilyChartView({ persons, selectedA, selectedB, onPerso
   return (
     <div className="w-full h-full" style={{ width: '100%', height: '100%', minHeight: '400px' }}>
       <ReactFlow
+      minZoom={0.1}
+      maxZoom={1.8}
+      
+  fitViewOptions={{ padding: 0.2 }}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}

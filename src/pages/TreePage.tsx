@@ -15,6 +15,22 @@ import {
   type PostRelationDto,
 } from '@/api/core'
 import FamilyChartView from '@/components/tree/FamilyChartView'
+import { Check, ChevronsUpDown } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+
 
 type PersonFormState = {
   name: string
@@ -375,36 +391,97 @@ export default function TreePage() {
           <div className="text-sm font-medium">Add Relation</div>
           <div className="mt-3 space-y-3">
             <div className="grid gap-1">
-              <label className="text-xs text-muted-foreground">Person A</label>
-              <select
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                value={relationForm.fromId ?? ''}
-                onChange={(e) => setRelationForm((s) => ({ ...s, fromId: e.target.value ? Number(e.target.value) : undefined }))}
-              >
-                <option value="">Select person</option>
-                {persons.filter((p) => p.id != null).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name ?? `Person ${p.id}`}
-                  </option>
-                ))}
-              </select>
-            </div>
+  <label className="text-xs text-muted-foreground">Person A</label>
+
+  <Popover>
+    <PopoverTrigger asChild>
+      <Button
+        variant="outline"
+        role="combobox"
+        className="w-full justify-between"
+      >
+        {relationForm.fromId
+          ? persons.find(p => p.id === relationForm.fromId)?.name
+          : "Select person"}
+        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+      </Button>
+    </PopoverTrigger>
+
+    <PopoverContent className="w-full p-0">
+      <Command>
+        <CommandInput placeholder="Search person..." />
+        <CommandEmpty>No person found.</CommandEmpty>
+
+        <CommandGroup>
+          {persons.filter(p => p.id != null).map((p) => (
+            <CommandItem
+              key={p.id}
+              value={p.name ?? String(p.id)}
+              onSelect={() =>
+                setRelationForm(s => ({ ...s, fromId: p.id! }))
+              }
+            >
+              <Check
+                className={cn(
+                  "mr-2 h-4 w-4",
+                  relationForm.fromId === p.id ? "opacity-100" : "opacity-0"
+                )}
+              />
+              {p.name ?? `Person ${p.id}`}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </Command>
+    </PopoverContent>
+  </Popover>
+</div>
+
 
             <div className="grid gap-1">
-              <label className="text-xs text-muted-foreground">Person B</label>
-              <select
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                value={relationForm.toId ?? ''}
-                onChange={(e) => setRelationForm((s) => ({ ...s, toId: e.target.value ? Number(e.target.value) : undefined }))}
-              >
-                <option value="">Select person</option>
-                {persons.filter((p) => p.id != null).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name ?? `Person ${p.id}`}
-                  </option>
-                ))}
-              </select>
-            </div>
+  <label className="text-xs text-muted-foreground">Person B</label>
+
+  <Popover>
+    <PopoverTrigger asChild>
+      <Button
+        variant="outline"
+        role="combobox"
+        className="w-full justify-between"
+      >
+        {relationForm.toId
+          ? persons.find(p => p.id === relationForm.toId)?.name
+          : "Select person"}
+        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+      </Button>
+    </PopoverTrigger>
+
+    <PopoverContent className="w-full p-0">
+      <Command>
+        <CommandInput placeholder="Search person..." />
+        <CommandEmpty>No person found.</CommandEmpty>
+
+        <CommandGroup>
+          {persons.filter(p => p.id != null).map((p) => (
+            <CommandItem
+              key={p.id}
+              value={p.name ?? String(p.id)}
+              onSelect={() =>
+                setRelationForm(s => ({ ...s, toId: p.id! }))
+              }
+            >
+              <Check
+                className={cn(
+                  "mr-2 h-4 w-4",
+                  relationForm.toId === p.id ? "opacity-100" : "opacity-0"
+                )}
+              />
+              {p.name ?? `Person ${p.id}`}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </Command>
+    </PopoverContent>
+  </Popover>
+</div>
 
             <div className="grid gap-1">
               <label className="text-xs text-muted-foreground">Relation Type</label>
@@ -443,33 +520,81 @@ export default function TreePage() {
               <div className="grid grid-cols-2 gap-2">
                 <div className="grid gap-1">
                   <label className="text-xs text-muted-foreground">Person A</label>
-                  <select
-                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                    value={selectedA ?? ''}
-                    onChange={(e) => setSelectedA(e.target.value || null)}
-                  >
-                    <option value="">Select person</option>
-                    {persons.filter((p) => p.id != null).map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name ?? `Person ${p.id}`}
-                      </option>
-                    ))}
-                  </select>
+                  <Popover>
+  <PopoverTrigger asChild>
+    <Button variant="outline" role="combobox" className="w-full justify-between">
+      {selectedA
+        ? persons.find(p => String(p.id) === selectedA)?.name
+        : "Select person"}
+      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+    </Button>
+  </PopoverTrigger>
+
+  <PopoverContent className="w-full p-0">
+    <Command>
+      <CommandInput placeholder="Search person..." />
+      <CommandEmpty>No person found.</CommandEmpty>
+
+      <CommandGroup>
+        {persons.filter(p => p.id != null).map(p => (
+          <CommandItem
+            key={p.id}
+            value={p.name ?? String(p.id)}
+            onSelect={() => setSelectedA(String(p.id))}
+          >
+            <Check
+              className={cn(
+                "mr-2 h-4 w-4",
+                selectedA === String(p.id) ? "opacity-100" : "opacity-0"
+              )}
+            />
+            {p.name ?? `Person ${p.id}`}
+          </CommandItem>
+        ))}
+      </CommandGroup>
+    </Command>
+  </PopoverContent>
+</Popover>
+
                 </div>
                 <div className="grid gap-1">
                   <label className="text-xs text-muted-foreground">Person B</label>
-                  <select
-                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                    value={selectedB ?? ''}
-                    onChange={(e) => setSelectedB(e.target.value || null)}
-                  >
-                    <option value="">Select person</option>
-                    {persons.filter((p) => p.id != null).map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name ?? `Person ${p.id}`}
-                      </option>
-                    ))}
-                  </select>
+                 <Popover>
+  <PopoverTrigger asChild>
+    <Button variant="outline" role="combobox" className="w-full justify-between">
+      {selectedB
+  ? persons.find(p => String(p.id) === selectedB)?.name
+  : "Select person"}
+      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+    </Button>
+  </PopoverTrigger>
+
+  <PopoverContent className="w-full p-0">
+    <Command>
+      <CommandInput placeholder="Search person..." />
+      <CommandEmpty>No person found.</CommandEmpty>
+
+      <CommandGroup>
+        {persons.filter(p => p.id != null).map(p => (
+          <CommandItem
+            key={p.id}
+            value={p.name ?? String(p.id)}
+            onSelect={() => setSelectedB(String(p.id))}
+          >
+            <Check
+              className={cn(
+                "mr-2 h-4 w-4",
+                selectedB === String(p.id) ? "opacity-100" : "opacity-0"
+              )}
+            />
+            {p.name ?? `Person ${p.id}`}
+          </CommandItem>
+        ))}
+      </CommandGroup>
+    </Command>
+  </PopoverContent>
+</Popover>
+
                 </div>
               </div>
 
