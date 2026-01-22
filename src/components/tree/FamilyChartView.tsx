@@ -340,7 +340,7 @@ export default function FamilyChartView({ persons, selectedA, selectedB, onPerso
         style={{ background: '#fafafa', width: '100%', height: '100%' }}
       >
         <Background />
-        <MiniMap pannable zoomable />
+        {/* <MiniMap pannable zoomable /> */}
         <Controls />
       </ReactFlow>
     </div>
