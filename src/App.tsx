@@ -5,6 +5,7 @@ import RegisterPage from '@/pages/RegisterPage'
 import AppShell from '@/pages/AppShell'
 import RelationsSummaryPage from '@/pages/RelationsSummaryPage'
 import TreePage from '@/pages/TreePage'
+import FamiliesPage from '@/pages/FamiliesPage'
 
 function App() {
   return (
@@ -14,8 +15,9 @@ function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
-          <Route path="/" element={<TreePage />} />
+          <Route path="/" element={<FamiliesPage />} />
           <Route path="/relations" element={<RelationsSummaryPage />} />
+          <Route path="/tree/:familyId" element={<TreePage />} />
         </Route>
       </Route>
 

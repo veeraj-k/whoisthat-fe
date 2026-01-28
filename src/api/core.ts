@@ -3,6 +3,15 @@ import { apiFetch } from '@/lib/api-client'
 export type Gender = 'MALE' | 'FEMALE' | 'UNKNOWN'
 export type RelationType = 'PARENT' | 'SIBLING' | 'SPOUSE'
 
+export type FamilyDto = {
+  id: number
+  name: string
+}
+
+export type CreateFamilyDto = {
+  familyName: string
+}
+
 export type PersonBasicDTO = {
   id?: number
   name?: string
@@ -141,6 +150,21 @@ export function getSimplifiedRelationPath(params: {
   if (params.lang) qs.set('lang', params.lang)
 
   return apiFetch<string>(`/api/v1/core/relations/simplified?${qs.toString()}`)
+}
+
+export function getAllFamilies(): Promise<FamilyDto[]> {
+  return apiFetch<FamilyDto[]>('/api/v1/core/families')
+}
+
+export function getPersonsByFamily(familyId: number): Promise<PersonDto[]> {
+  return apiFetch<PersonDto[]>(`/api/v1/core/families/${familyId}/persons`)
+}
+
+export function createFamily(data: CreateFamilyDto): Promise<FamilyDto> {
+  return apiFetch<FamilyDto>('/api/v1/core/families', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
 }
 
 export function getRelationPath(params: { from: number; to: number }): Promise<RelationStep> {

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { ToastContainer, Zoom, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import './TreePage.css'
 import {
-  getAllPersons,
   getSimplifiedRelationPath,
   type Gender,
   type PersonDto,
@@ -13,6 +13,11 @@ import {
   createRelation,
   type RelationType,
   type PostRelationDto,
+  getAllFamilies,
+  createFamily,
+  type FamilyDto,
+  type CreateFamilyDto,
+  getPersonsByFamily,
 } from '@/api/core'
 import FamilyChartView from '@/components/tree/FamilyChartView'
 import { Check, ChevronsUpDown } from "lucide-react"
@@ -45,9 +50,13 @@ const languageOptions = [
 ]
 
 export default function TreePage() {
+  const { familyId } = useParams<{ familyId: string }>()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [persons, setPersons] = useState<PersonDto[]>([])
+  const [currentFamily, setCurrentFamily] = useState<FamilyDto | null>(null)
 
   const [activePersonId, setActivePersonId] = useState<string | null>(null)
   const [selectedA, setSelectedA] = useState<string | null>(null)
@@ -74,15 +83,30 @@ export default function TreePage() {
   const [relationSaving, setRelationSaving] = useState(false)
   const [relationSaveError, setRelationSaveError] = useState<string | null>(null)
 
+  // Family state
+  const [families, setFamilies] = useState<FamilyDto[]>([])
+  const [familyLoading, setFamilyLoading] = useState(false)
+  const [familyError, setFamilyError] = useState<string | null>(null)
+  const [familyForm, setFamilyForm] = useState<CreateFamilyDto>({ familyName: '' })
+  const [familySaving, setFamilySaving] = useState(false)
+  const [familySaveError, setFamilySaveError] = useState<string | null>(null)
+
   // Mobile sidebar state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
   async function load() {
+    if (!familyId) return
+    
     setError(null)
     setLoading(true)
     try {
-      const p = await getAllPersons()
+      const p = await getPersonsByFamily(Number(familyId))
       setPersons(p)
+      
+      // Get family details
+      const families = await getAllFamilies()
+      const family = families.find(f => f.id === Number(familyId))
+      setCurrentFamily(family || null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data')
     } finally {
@@ -90,9 +114,42 @@ export default function TreePage() {
     }
   }
 
+  async function loadFamilies() {
+    setFamilyError(null)
+    setFamilyLoading(true)
+    try {
+      const f = await getAllFamilies()
+      setFamilies(f)
+    } catch (err) {
+      setFamilyError(err instanceof Error ? err.message : 'Failed to load families')
+    } finally {
+      setFamilyLoading(false)
+    }
+  }
+
+  async function submitFamily() {
+    if (!familyForm.familyName.trim()) {
+      setFamilySaveError('Family name is required')
+      return
+    }
+    setFamilySaveError(null)
+    setFamilySaving(true)
+    try {
+      await createFamily(familyForm)
+      setFamilyForm({ familyName: '' })
+      await loadFamilies()
+      toast.success('Family created successfully')
+    } catch (err) {
+      setFamilySaveError(err instanceof Error ? err.message : 'Failed to create family')
+    } finally {
+      setFamilySaving(false)
+    }
+  }
+
   useEffect(() => {
     void load()
-  }, [])
+    void loadFamilies()
+  }, [familyId])
 
   useEffect(() => {
     async function decodeRelation(a: string, b: string, lang: string) {
@@ -254,7 +311,46 @@ export default function TreePage() {
   }
 
   return (
-    <div className="min-h-[calc(100dvh-56px)] lg:h-[calc(100dvh-56px)] grid grid-cols-1 lg:grid-cols-[1fr_380px]">
+    <div className="min-h-[calc(100dvh-56px)] lg:h-[calc(100dvh-56px)]">
+      {/* Family Navigation Header */}
+      <div className="border-b bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40">
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-4">
+            <button 
+              className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+              onClick={() => navigate('/')}
+            >
+              ← Back to Families
+            </button>
+            {currentFamily && (
+              <div>
+                <span className="font-semibold">{currentFamily.name}</span>
+                <span className="text-sm text-muted-foreground ml-2">Family ID: {currentFamily.id}</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className={`rounded-md px-3 py-1.5 text-sm ${
+                location.pathname === `/tree/${familyId}` ? 'bg-accent text-accent-foreground' : 'hover:bg-accent'
+              }`}
+              onClick={() => navigate(`/tree/${familyId}`)}
+            >
+              Tree
+            </button>
+            <button
+              className={`rounded-md px-3 py-1.5 text-sm ${
+                location.pathname === `/relations` ? 'bg-accent text-accent-foreground' : 'hover:bg-accent'
+              }`}
+              onClick={() => navigate('/relations')}
+            >
+              Relations
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="min-h-[calc(100dvh-112px)] lg:h-[calc(100dvh-112px)] grid grid-cols-1 lg:grid-cols-[1fr_380px]">
       {/* Mobile sidebar toggle button */}
       <button
         className="lg:hidden fixed top-4 right-4 z-20 rounded-md border bg-card/80 backdrop-blur p-2 shadow-md"
@@ -516,6 +612,58 @@ export default function TreePage() {
           </div>
         </div>
 
+        {/* Family Management Section */}
+        <div className="rounded-xl border bg-card p-4">
+          <div className="text-sm font-medium">Families</div>
+          <div className="mt-2 text-xs text-muted-foreground">
+            View and manage your family groups
+          </div>
+
+          <div className="mt-3 space-y-3">
+            {/* Family List */}
+            <div className="space-y-2">
+              {familyLoading ? (
+                <div className="text-sm text-muted-foreground">Loading families...</div>
+              ) : familyError ? (
+                <div className="text-sm text-destructive">{familyError}</div>
+              ) : families.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No families yet</div>
+              ) : (
+                <div className="space-y-1">
+                  {families.map((family) => (
+                    <div
+                      key={family.id}
+                      className="flex items-center justify-between rounded-md border bg-background p-2"
+                    >
+                      <span className="text-sm">{family.name}</span>
+                      <span className="text-xs text-muted-foreground">ID: {family.id}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Create Family Form */}
+            <div className="grid gap-2">
+              <label className="text-xs text-muted-foreground">Create New Family</label>
+              <input
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                placeholder="Family name..."
+                value={familyForm.familyName}
+                onChange={(e) => setFamilyForm((s) => ({ ...s, familyName: e.target.value }))}
+              />
+              {familySaveError ? <div className="text-sm text-destructive">{familySaveError}</div> : null}
+              <button
+                className="w-full rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm disabled:opacity-50"
+                disabled={familySaving}
+                onClick={() => void submitFamily()}
+              >
+                {familySaving ? 'Creating…' : 'Create Family'}
+              </button>
+            </div>
+          </div>
+        </div>
+
           <div className="rounded-xl border bg-card p-4">
             <div className="text-sm font-medium">Relationship decoder</div>
             <div className="mt-2 text-xs text-muted-foreground">
@@ -656,6 +804,7 @@ export default function TreePage() {
         className="toast-container"
         toastClassName="toast-item"
       />
+    </div>
     </div>
   )
 }
