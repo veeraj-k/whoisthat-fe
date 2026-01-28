@@ -90,6 +90,13 @@ export function createPerson(body: PostPersonDto): Promise<PersonDto> {
   })
 }
 
+export function createPersonInFamily(familyId: number, body: PostPersonDto): Promise<PersonDto> {
+  return apiFetch<PersonDto>(`/api/v1/core/families/${familyId}/persons`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
 export function getPersonById(id: number): Promise<PersonDto> {
   return apiFetch<PersonDto>(`/api/v1/core/persons/${id}`)
 }

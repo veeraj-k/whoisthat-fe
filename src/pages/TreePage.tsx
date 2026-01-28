@@ -9,7 +9,7 @@ import {
   type PersonDto,
   updatePerson,
   deletePersonById,
-  createPerson,
+  createPersonInFamily,
   createRelation,
   type RelationType,
   type PostRelationDto,
@@ -233,7 +233,11 @@ export default function TreePage() {
     setPersonSaving(true)
     try {
       if (personFormMode === 'create') {
-        await createPerson({ name: personForm.name, gender: personForm.gender })
+        if (!familyId) {
+          setPersonSaveError('Family ID is required to create a person')
+          return
+        }
+        await createPersonInFamily(Number(familyId), { name: personForm.name, gender: personForm.gender })
         setPersonForm({ name: '', gender: 'UNKNOWN' })
       } else {
         if (!activePersonId) return
