@@ -115,6 +115,7 @@ type Props = {
   selectedA: string | null;
   selectedB: string | null;
   onPersonClick: (personId: string) => void;
+  familyId?: number;
 };
 
 function getRelationStroke(type?: string): {
@@ -170,10 +171,18 @@ export default function FamilyChartView({
   selectedA,
   selectedB,
   onPersonClick,
+  familyId,
 }: Props) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
-  const layoutKey = useMemo(() => getLayoutKey(persons), [persons]);
+  // Use familyId for stable layout key - persists across person additions/deletions
+  const layoutKey = useMemo(() => {
+    if (familyId) {
+      return `family-tree-layout-${familyId}`;
+    }
+    // Fallback to person IDs if familyId not provided
+    return getLayoutKey(persons);
+  }, [familyId, persons]);
 
   const nodeTypes = useMemo(
     () => ({ person: PersonNode }) as unknown as NodeTypes,
