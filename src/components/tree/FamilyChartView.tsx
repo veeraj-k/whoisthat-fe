@@ -16,6 +16,7 @@ import {
   type EdgeProps,
   applyEdgeChanges,
   applyNodeChanges,
+  type Position,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import * as dagre from "dagre";
@@ -28,6 +29,12 @@ import {
   saveLayoutPositions,
   extractNodePositions,
 } from "@/lib/tree-layout-storage";
+
+// Extend Edge type to include position properties
+type PositionedEdge = Edge & {
+  sourcePosition?: Position;
+  targetPosition?: Position;
+};
 
 // Custom edge component that properly renders edges with labels
 function CustomEdge(props: EdgeProps) {
@@ -174,7 +181,7 @@ export default function FamilyChartView({
   familyId,
 }: Props) {
   const [nodes, setNodes] = useState<Node[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
+  const [edges, setEdges] = useState<PositionedEdge[]>([]);
   // Use familyId for stable layout key - persists across person additions/deletions
   const layoutKey = useMemo(() => {
     if (familyId) {
@@ -241,7 +248,7 @@ export default function FamilyChartView({
     // Create a set of valid node IDs to ensure edges only connect to existing nodes
     const validNodeIds = new Set(baseNodes.map((n) => n.id));
 
-    const nextEdges: Edge[] = [];
+    const nextEdges: PositionedEdge[] = [];
     for (const person of persons) {
       if (person.id == null) continue;
       const pid = String(person.id);
@@ -289,6 +296,8 @@ export default function FamilyChartView({
             id: edgeId,
             source: pid,
             target: spouse,
+            sourceHandle: "spouse-right",
+            targetHandle: "spouse-left",
             type: "custom",
             label: "SPOUSE",
             labelStyle: { fontSize: 10, fill: "#ec4899" },
@@ -328,6 +337,8 @@ export default function FamilyChartView({
             id: edgeId,
             source: pid,
             target: sibling,
+            sourceHandle: "sibling-left",
+            targetHandle: "sibling-right-target",
             type: "custom",
             label: "SIBLING",
             labelStyle: { fontSize: 10, fill: "#6366f1" },
