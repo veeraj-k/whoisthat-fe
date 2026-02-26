@@ -248,6 +248,17 @@ export default function TreePage() {
     setActivePersonId(null);
   }
 
+  function startEditPerson(person: PersonDto) {
+    if (!person.id) return;
+    setPersonFormMode("edit");
+    setPersonForm({
+      name: person.name ?? "",
+      gender: person.gender ?? "UNKNOWN",
+    });
+    setPersonSaveError(null);
+    setActivePersonId(String(person.id));
+  }
+
   async function submitPerson() {
     setPersonSaveError(null);
     setPersonSaving(true);
@@ -263,8 +274,8 @@ export default function TreePage() {
         });
         setPersonForm({ name: "", gender: "UNKNOWN" });
       } else {
-        if (!activePersonId) return;
-        await updatePerson(Number(activePersonId), {
+        if (!activePersonId || !familyId) return;
+        await updatePerson(Number(familyId), Number(activePersonId), {
           name: personForm.name,
           gender: personForm.gender,
         });
@@ -280,11 +291,11 @@ export default function TreePage() {
   }
 
   async function removePerson() {
-    if (!activePersonId) return;
+    if (!activePersonId || !familyId) return;
     setPersonSaveError(null);
     setPersonSaving(true);
     try {
-      await deletePersonById(Number(activePersonId));
+      await deletePersonById(Number(familyId), Number(activePersonId));
       await load();
       setPersonForm({ name: "", gender: "UNKNOWN" });
       setActivePersonId(null);
@@ -518,6 +529,37 @@ export default function TreePage() {
               </div>
             </div>
 
+            {/* People List Section */}
+            <div className="rounded-xl border bg-card p-4">
+              <div className="text-sm font-medium mb-3">People in Family</div>
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {persons.filter((p) => p.id != null).length === 0 ? (
+                  <div className="text-xs text-muted-foreground py-2">
+                    No people yet
+                  </div>
+                ) : (
+                  persons
+                    .filter((p) => p.id != null)
+                    .map((person) => (
+                      <button
+                        key={person.id}
+                        onClick={() => startEditPerson(person)}
+                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                          activePersonId === String(person.id)
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-accent text-foreground"
+                        }`}
+                      >
+                        <div className="font-medium">{person.name}</div>
+                        <div className="text-xs opacity-70">
+                          {person.gender}
+                        </div>
+                      </button>
+                    ))
+                )}
+              </div>
+            </div>
+
             <div className="rounded-xl border bg-card p-4">
               <div className="text-sm font-medium">Person</div>
               <div className="mt-3 space-y-3">
@@ -525,6 +567,9 @@ export default function TreePage() {
                   <label className="text-xs text-muted-foreground">Name</label>
                   <input
                     className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    placeholder={
+                      personFormMode === "create" ? "Enter name..." : ""
+                    }
                     value={personForm.name}
                     onChange={(e) =>
                       setPersonForm((s) => ({ ...s, name: e.target.value }))
@@ -559,25 +604,34 @@ export default function TreePage() {
                   </div>
                 ) : null}
 
-                <div className="flex gap-2">
-                  <button
-                    className="flex-1 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm disabled:opacity-50"
-                    disabled={personSaving}
-                    onClick={() => void submitPerson()}
-                  >
-                    {personSaving
-                      ? "Saving…"
-                      : personFormMode === "create"
-                        ? "Create"
-                        : "Save"}
-                  </button>
-                  {personFormMode === "edit" ? (
+                <div className="flex gap-2 flex-col">
+                  <div className="flex gap-2">
+                    <button
+                      className="flex-1 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm disabled:opacity-50"
+                      disabled={personSaving || !personForm.name.trim()}
+                      onClick={() => void submitPerson()}
+                    >
+                      {personSaving
+                        ? "Saving…"
+                        : personFormMode === "create"
+                          ? "Create"
+                          : "Save"}
+                    </button>
                     <button
                       className="rounded-md border px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
                       disabled={personSaving}
+                      onClick={startCreatePerson}
+                    >
+                      {personFormMode === "create" ? "Clear" : "New"}
+                    </button>
+                  </div>
+                  {personFormMode === "edit" ? (
+                    <button
+                      className="w-full rounded-md border border-destructive text-destructive px-3 py-2 text-sm hover:bg-destructive/10 disabled:opacity-50"
+                      disabled={personSaving}
                       onClick={() => void removePerson()}
                     >
-                      Delete
+                      Delete Person
                     </button>
                   ) : null}
                 </div>
