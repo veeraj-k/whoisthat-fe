@@ -48,6 +48,22 @@ export type PostPersonDto = {
   relations?: PostRelationDto[];
 };
 
+export type LayoutPositionDto = {
+  nodeId: string;
+  x: number;
+  y: number;
+};
+
+export type TreeLayoutDto = {
+  id?: number;
+  familyId: number;
+  layout: string;
+};
+
+export type SaveLayoutRequestDto = {
+  positions: LayoutPositionDto[];
+};
+
 export type RelationDto = {
   toPerson?: PersonBasicDTO;
   fromPerson?: PersonBasicDTO;
@@ -219,5 +235,24 @@ export function getRelationRawPath(params: {
 
   return apiFetch<RelationPathDto>(
     `/api/v1/core/relations/path/raw?${qs.toString()}`,
+  );
+}
+
+export function getTreeLayout(familyId: number): Promise<TreeLayoutDto | null> {
+  return apiFetch<TreeLayoutDto | null>(
+    `/api/v1/core/families/${familyId}/layout`,
+  );
+}
+
+export function saveTreeLayout(
+  familyId: number,
+  body: SaveLayoutRequestDto,
+): Promise<TreeLayoutDto> {
+  return apiFetch<TreeLayoutDto>(
+    `/api/v1/core/families/${familyId}/layout`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
   );
 }

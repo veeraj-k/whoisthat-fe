@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, forwardRef, useImperativeHandle } from "react";
 import type React from "react";
 import {
   Background,
@@ -21,6 +21,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import * as dagre from "dagre";
 import type { PersonDto } from "@/api/core";
+import { getTreeLayout, saveTreeLayout } from "@/api/core";
 import PersonNode from "./PersonNode";
 import {
   getLayoutKey,
@@ -125,6 +126,10 @@ type Props = {
   familyId?: number;
 };
 
+export type FamilyChartViewHandle = {
+  saveLayout: () => Promise<void>;
+};
+
 function getRelationStroke(type?: string): {
   stroke: string;
   strokeDasharray?: string;
@@ -173,15 +178,25 @@ function layoutTree(nodes: Node[], edges: Edge[]): Node[] {
   });
 }
 
-export default function FamilyChartView({
-  persons,
-  selectedA,
-  selectedB,
-  onPersonClick,
-  familyId,
-}: Props) {
+const FamilyChartViewComponent = forwardRef<FamilyChartViewHandle, Props>(
+  (
+    {
+      persons,
+      selectedA,
+      selectedB,
+      onPersonClick,
+      familyId,
+    },
+    ref,
+  ) => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<PositionedEdge[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastSaveTime, setLastSaveTime] = useState<number | null>(null);
+  const [serverPositions, setServerPositions] = useState<
+    Array<{ id: string; position: { x: number; y: number } }> | null
+  >(null);
   // Use familyId for stable layout key - persists across person additions/deletions
   const layoutKey = useMemo(() => {
     if (familyId) {
@@ -195,6 +210,59 @@ export default function FamilyChartView({
     () => ({ person: PersonNode }) as unknown as NodeTypes,
     [],
   );
+
+  // Load layout from API on mount
+  useEffect(() => {
+    async function loadLayoutFromServer() {
+      if (!familyId) return;
+      try {
+        const layout = await getTreeLayout(familyId);
+        if (layout?.layout) {
+          // Parse the layout JSON string
+          const positions = JSON.parse(layout.layout).positions;
+          const layoutPositions = positions.map((p: any) => ({
+            id: p.nodeId,
+            position: { x: p.x, y: p.y },
+          }));
+          setServerPositions(layoutPositions);
+          saveLayoutPositions(layoutKey, layoutPositions);
+        }
+      } catch (err) {
+        console.warn("Failed to load layout from server:", err);
+        // Silently fail - will use auto-layout instead
+      }
+    }
+    void loadLayoutFromServer();
+  }, [familyId, layoutKey]);
+
+  // Save layout to API
+  async function saveLayoutToServer() {
+    if (!familyId || nodes.length === 0) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const positions = extractNodePositions(nodes).map((p) => ({
+        nodeId: p.id,
+        x: p.position.x,
+        y: p.position.y,
+      }));
+
+      await saveTreeLayout(familyId, { positions });
+      setLastSaveTime(Date.now());
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to save layout";
+      setSaveError(msg);
+      console.error("Failed to save layout:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  useImperativeHandle(ref, () => ({
+    saveLayout: saveLayoutToServer,
+  }));
 
   useEffect(() => {
     const parentsMap = new Map<string, Set<string>>();
@@ -368,8 +436,18 @@ export default function FamilyChartView({
 
     const laidOutNodes = layoutTree(baseNodes, nextEdges);
 
-    // Load saved positions from localStorage and merge with auto-layout
-    const savedPositions = loadLayoutPositions(layoutKey);
+    // Use server positions if available, otherwise fall back to localStorage
+    let savedPositions: Map<string, { x: number; y: number }>;
+    if (serverPositions) {
+      // Convert server positions array to Map
+      savedPositions = new Map(
+        serverPositions.map((p) => [p.id, p.position])
+      );
+    } else {
+      // Load from localStorage
+      savedPositions = loadLayoutPositions(layoutKey);
+    }
+    
     const nodesWithSavedPositions = mergeNodePositions(
       laidOutNodes,
       savedPositions,
@@ -377,7 +455,7 @@ export default function FamilyChartView({
 
     setNodes(nodesWithSavedPositions);
     setEdges(nextEdges);
-  }, [persons, selectedA, selectedB, layoutKey]);
+  }, [persons, selectedA, selectedB, layoutKey, serverPositions]);
 
   const onNodesChange: OnNodesChange = (changes) =>
     setNodes((nds) => applyNodeChanges(changes, nds));
@@ -387,14 +465,6 @@ export default function FamilyChartView({
   const onNodeClick: NodeMouseHandler = (_, node) => {
     onPersonClick(node.id);
   };
-
-  // Save node positions to localStorage whenever they change
-  useEffect(() => {
-    if (nodes.length > 0) {
-      const positions = extractNodePositions(nodes);
-      saveLayoutPositions(layoutKey, positions);
-    }
-  }, [nodes, layoutKey]);
 
   return (
     <div
@@ -424,7 +494,13 @@ export default function FamilyChartView({
       </ReactFlow>
     </div>
   );
-}
+  },
+);
+
+FamilyChartViewComponent.displayName = "FamilyChartView";
+
+const FamilyChartView = FamilyChartViewComponent as any;
+export default FamilyChartView;
 
 function pushUnique(map: Map<string, Set<string>>, key: string, value: string) {
   const set = map.get(key) ?? new Set<string>();

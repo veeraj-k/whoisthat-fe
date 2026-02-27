@@ -18,7 +18,7 @@ import {
   type CreateFamilyDto,
   getPersonsByFamily,
 } from "@/api/core";
-import FamilyChartView from "@/components/tree/FamilyChartView";
+import FamilyChartView, { type FamilyChartViewHandle } from "@/components/tree/FamilyChartView";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,10 +51,14 @@ export default function TreePage() {
   const { familyId } = useParams<{ familyId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const familyChartRef = useRef<FamilyChartViewHandle>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [persons, setPersons] = useState<PersonDto[]>([]);
   const [currentFamily, setCurrentFamily] = useState<FamilyDto | null>(null);
+  const [isSavingLayout, setIsSavingLayout] = useState(false);
+  const [saveLayoutError, setSaveLayoutError] = useState<string | null>(null);
+  const [lastSaveTime, setLastSaveTime] = useState<number | null>(null);
 
   const [activePersonId, setActivePersonId] = useState<string | null>(null);
   const [selectedA, setSelectedA] = useState<string | null>(null);
@@ -370,6 +374,25 @@ export default function TreePage() {
     }
   }
 
+  async function saveLayout() {
+    setSaveLayoutError(null);
+    setIsSavingLayout(true);
+    try {
+      if (familyChartRef.current) {
+        await familyChartRef.current.saveLayout();
+        setLastSaveTime(Date.now());
+        toast.success("Layout saved successfully");
+      }
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to save layout";
+      setSaveLayoutError(msg);
+      toast.error(msg);
+    } finally {
+      setIsSavingLayout(false);
+    }
+  }
+
   return (
     <div className="min-h-[calc(100dvh-56px)] lg:h-[calc(100dvh-56px)]">
       {/* Family Navigation Header */}
@@ -412,6 +435,15 @@ export default function TreePage() {
             >
               Relations
             </button>
+            {location.pathname === `/tree/${familyId}` && (
+              <button
+                className="rounded-md bg-green-600 text-white px-3 py-1.5 text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => void saveLayout()}
+                disabled={isSavingLayout}
+              >
+                {isSavingLayout ? "Saving..." : "Save Layout"}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -481,6 +513,7 @@ export default function TreePage() {
             </div>
           ) : (
             <FamilyChartView
+              ref={familyChartRef}
               persons={persons}
               selectedA={selectedA}
               selectedB={selectedB}
