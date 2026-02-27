@@ -248,11 +248,8 @@ export function saveTreeLayout(
   familyId: number,
   body: SaveLayoutRequestDto,
 ): Promise<TreeLayoutDto> {
-  return apiFetch<TreeLayoutDto>(
-    `/api/v1/core/families/${familyId}/layout`,
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-    },
-  );
+  return apiFetch<TreeLayoutDto>(`/api/v1/core/families/${familyId}/layout`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }

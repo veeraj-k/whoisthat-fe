@@ -18,7 +18,9 @@ import {
   type CreateFamilyDto,
   getPersonsByFamily,
 } from "@/api/core";
-import FamilyChartView, { type FamilyChartViewHandle } from "@/components/tree/FamilyChartView";
+import FamilyChartView, {
+  type FamilyChartViewHandle,
+} from "@/components/tree/FamilyChartView";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -384,8 +386,7 @@ export default function TreePage() {
         toast.success("Layout saved successfully");
       }
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to save layout";
+      const msg = err instanceof Error ? err.message : "Failed to save layout";
       setSaveLayoutError(msg);
       toast.error(msg);
     } finally {
