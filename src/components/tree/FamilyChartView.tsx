@@ -188,6 +188,9 @@ const FamilyChartViewComponent = forwardRef<FamilyChartViewHandle, Props>(
   ({ persons, selectedA, selectedB, onPersonClick, familyId }, ref) => {
     const [nodes, setNodes] = useState<Node[]>([]);
     const [edges, setEdges] = useState<PositionedEdge[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [lastSaveTime, setLastSaveTime] = useState<number | null>(null);
     const [serverPositions, setServerPositions] = useState<Array<{
       id: string;
       position: { x: number; y: number };

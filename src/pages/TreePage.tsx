@@ -59,6 +59,8 @@ export default function TreePage() {
   const [persons, setPersons] = useState<PersonDto[]>([]);
   const [currentFamily, setCurrentFamily] = useState<FamilyDto | null>(null);
   const [isSavingLayout, setIsSavingLayout] = useState(false);
+  const [saveLayoutError, setSaveLayoutError] = useState<string | null>(null);
+  const [lastSaveTime, setLastSaveTime] = useState<number | null>(null);
 
   const [activePersonId, setActivePersonId] = useState<string | null>(null);
   const [selectedA, setSelectedA] = useState<string | null>(null);
