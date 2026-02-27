@@ -59,8 +59,6 @@ export default function TreePage() {
   const [persons, setPersons] = useState<PersonDto[]>([]);
   const [currentFamily, setCurrentFamily] = useState<FamilyDto | null>(null);
   const [isSavingLayout, setIsSavingLayout] = useState(false);
-  const [saveLayoutError, setSaveLayoutError] = useState<string | null>(null);
-  const [lastSaveTime, setLastSaveTime] = useState<number | null>(null);
 
   const [activePersonId, setActivePersonId] = useState<string | null>(null);
   const [selectedA, setSelectedA] = useState<string | null>(null);
@@ -377,17 +375,14 @@ export default function TreePage() {
   }
 
   async function saveLayout() {
-    setSaveLayoutError(null);
     setIsSavingLayout(true);
     try {
       if (familyChartRef.current) {
         await familyChartRef.current.saveLayout();
-        setLastSaveTime(Date.now());
         toast.success("Layout saved successfully");
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save layout";
-      setSaveLayoutError(msg);
       toast.error(msg);
     } finally {
       setIsSavingLayout(false);

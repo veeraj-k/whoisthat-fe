@@ -188,9 +188,6 @@ const FamilyChartViewComponent = forwardRef<FamilyChartViewHandle, Props>(
   ({ persons, selectedA, selectedB, onPersonClick, familyId }, ref) => {
     const [nodes, setNodes] = useState<Node[]>([]);
     const [edges, setEdges] = useState<PositionedEdge[]>([]);
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveError, setSaveError] = useState<string | null>(null);
-    const [lastSaveTime, setLastSaveTime] = useState<number | null>(null);
     const [serverPositions, setServerPositions] = useState<Array<{
       id: string;
       position: { x: number; y: number };
@@ -237,8 +234,6 @@ const FamilyChartViewComponent = forwardRef<FamilyChartViewHandle, Props>(
     async function saveLayoutToServer() {
       if (!familyId || nodes.length === 0) return;
 
-      setIsSaving(true);
-      setSaveError(null);
       try {
         const positions = extractNodePositions(nodes).map((p) => ({
           nodeId: p.id,
@@ -247,14 +242,9 @@ const FamilyChartViewComponent = forwardRef<FamilyChartViewHandle, Props>(
         }));
 
         await saveTreeLayout(familyId, { positions });
-        setLastSaveTime(Date.now());
       } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : "Failed to save layout";
-        setSaveError(msg);
         console.error("Failed to save layout:", err);
-      } finally {
-        setIsSaving(false);
+        throw err;
       }
     }
 
