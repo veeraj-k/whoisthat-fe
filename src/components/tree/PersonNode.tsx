@@ -6,15 +6,18 @@ type PersonNodeData = {
   gender?: Gender;
   selectedA?: boolean;
   selectedB?: boolean;
+  isMe?: boolean;
 };
 
 export default function PersonNode(props: NodeProps) {
   const data = props.data as PersonNodeData;
-  const ring = data.selectedA
-    ? "ring-2 ring-emerald-500"
-    : data.selectedB
-      ? "ring-2 ring-lime-500"
-      : "";
+  const ring = data.isMe
+    ? "ring-4 ring-yellow-400"
+    : data.selectedA
+      ? "ring-2 ring-emerald-500"
+      : data.selectedB
+        ? "ring-2 ring-lime-500"
+        : "";
 
   const theme =
     data.gender === "MALE"
@@ -86,9 +89,16 @@ export default function PersonNode(props: NodeProps) {
         <div className="text-base font-semibold leading-tight text-gray-900">
           {data.label}
         </div>
-        <div
-          className={`h-3 w-3 rounded-full ${badgeColor} flex-shrink-0 mt-0.5`}
-        />
+        <div className="flex items-center gap-1.5">
+          {data.isMe && (
+            <div className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded">
+              Me
+            </div>
+          )}
+          <div
+            className={`h-3 w-3 rounded-full ${badgeColor} flex-shrink-0 mt-0.5`}
+          />
+        </div>
       </div>
       <div className="mt-2 text-xs text-gray-500 uppercase tracking-wide">
         {data.gender ?? "UNKNOWN"}

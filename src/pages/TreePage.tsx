@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ToastContainer, Zoom, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./TreePage.css";
 import {
   getSimplifiedRelationPath,
+  getMePersonInFamily,
+  setMePersonInFamily,
   type Gender,
   type PersonDto,
   updatePerson,
@@ -109,7 +111,15 @@ export default function TreePage() {
   // Mobile sidebar state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  async function load() {
+  // Me person state
+  const [mePerson, setMePerson] = useState<PersonDto | null>(null);
+  const [meLoading, setMeLoading] = useState(false);
+  const [meError, setMeError] = useState<string | null>(null);
+  const [mePersonDropdownValue, setMePersonDropdownValue] =
+    useState<string>("");
+  const [autoDecodeWithMe, setAutoDecodeWithMe] = useState(false);
+
+  const load = useCallback(async () => {
     if (!familyId) return;
 
     setError(null);
@@ -127,9 +137,9 @@ export default function TreePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [familyId]);
 
-  async function loadFamilies() {
+  const loadFamilies = useCallback(async () => {
     setFamilyError(null);
     setFamilyLoading(true);
     try {
@@ -141,6 +151,47 @@ export default function TreePage() {
       );
     } finally {
       setFamilyLoading(false);
+    }
+  }, []);
+
+  const loadMePerson = useCallback(async () => {
+    if (!familyId) return;
+    setMeError(null);
+    setMeLoading(true);
+    try {
+      const me = await getMePersonInFamily(Number(familyId));
+      setMePerson(me);
+    } catch {
+      // Silently fail if me person not set (404 or 500)
+      setMeError(null);
+      setMePerson(null);
+    } finally {
+      setMeLoading(false);
+    }
+  }, [familyId]);
+
+  async function submitSetMePerson() {
+    if (!mePersonDropdownValue || !familyId) {
+      setMeError("Please select a person");
+      return;
+    }
+    setMeError(null);
+    setMeLoading(true);
+    try {
+      const me = await setMePersonInFamily(
+        Number(familyId),
+        Number(mePersonDropdownValue),
+      );
+      setMePerson(me);
+      setMePersonDropdownValue("");
+      toast.success(`${me.name} set as Me`);
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to set me person";
+      setMeError(msg);
+      toast.error(msg);
+    } finally {
+      setMeLoading(false);
     }
   }
 
@@ -168,7 +219,8 @@ export default function TreePage() {
   useEffect(() => {
     void load();
     void loadFamilies();
-  }, [familyId]);
+    void loadMePerson();
+  }, [load, loadFamilies, loadMePerson]);
 
   useEffect(() => {
     async function decodeRelation(a: string, b: string, lang: string) {
@@ -188,7 +240,7 @@ export default function TreePage() {
         setDecoderResult(res);
         toast.success(res);
       } catch (err) {
-        const status = (err as any)?.status;
+        const status = (err as { status?: number })?.status;
         if (status === 502) {
           const msg = "No connecting relation found.";
           setDecoderResult(msg);
@@ -216,6 +268,25 @@ export default function TreePage() {
   function onPersonPick(personId: string) {
     setActivePersonId(personId);
 
+    // If auto-decode with me is enabled and me is set
+    if (autoDecodeWithMe && mePerson?.id) {
+      if (String(mePerson.id) === personId) {
+        // Clicked on me person itself, deselect
+        setSelectedA(null);
+        setSelectedB(null);
+        setDecoderResult(null);
+        setDecoderError(null);
+      } else {
+        // Clicked on another person, set as B and use me as A
+        setSelectedA(String(mePerson.id));
+        setSelectedB(personId);
+        setDecoderResult(null);
+        setDecoderError(null);
+      }
+      return;
+    }
+
+    // Original behavior when auto-decode is off
     if (!selectedA) {
       setSelectedA(personId);
       setSelectedB(null);
@@ -392,7 +463,7 @@ export default function TreePage() {
   return (
     <div className="min-h-[calc(100dvh-56px)] lg:h-[calc(100dvh-56px)]">
       {/* Family Navigation Header */}
-      <div className="border-b bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40">
+      <div className="border-b bg-card/60 backdrop-blur supports-backdrop-filter:bg-card/40">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-4">
             <button
@@ -473,7 +544,7 @@ export default function TreePage() {
           />
         )}
 
-        <div className="relative h-full min-h-[400px]">
+        <div className="relative h-full min-h-100">
           <div className="absolute top-3 left-3 z-10 rounded-md border bg-card/80 backdrop-blur px-2 py-1 text-xs text-muted-foreground">
             People: {persons.filter((p) => p.id != null).length}
           </div>
@@ -515,6 +586,7 @@ export default function TreePage() {
               selectedB={selectedB}
               onPersonClick={onPersonPick}
               familyId={familyId ? Number(familyId) : undefined}
+              mePerson={mePerson}
             />
           )}
         </div>
@@ -527,6 +599,92 @@ export default function TreePage() {
           }`}
         >
           <div className="h-full overflow-auto p-4 space-y-4">
+            {/* Set Me Section - Compact */}
+            <div className="rounded-xl border bg-card p-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-medium">Auto-decode</label>
+                  <button
+                    onClick={() => setAutoDecodeWithMe(!autoDecodeWithMe)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      autoDecodeWithMe ? "bg-green-600" : "bg-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                        autoDecodeWithMe ? "translate-x-5" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between text-xs h-8"
+                    >
+                      {mePersonDropdownValue
+                        ? persons.find(
+                            (p) => String(p.id) === mePersonDropdownValue,
+                          )?.name
+                        : mePerson?.name || "Select me"}
+                      <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={4}
+                    className="w-full p-0"
+                  >
+                    <Command>
+                      <CommandInput placeholder="Search..." />
+                      <CommandEmpty>No person found.</CommandEmpty>
+
+                      <CommandGroup>
+                        {persons
+                          .filter((p) => p.id != null)
+                          .map((p) => (
+                            <CommandItem
+                              key={p.id}
+                              value={p.name ?? String(p.id)}
+                              onSelect={() =>
+                                setMePersonDropdownValue(String(p.id))
+                              }
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-3 w-3",
+                                  mePersonDropdownValue === String(p.id)
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
+                              {p.name ?? `Person ${p.id}`}
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                <button
+                  className="w-full rounded-md bg-primary text-primary-foreground px-2 py-1.5 text-xs disabled:opacity-50"
+                  disabled={meLoading || !mePersonDropdownValue}
+                  onClick={() => void submitSetMePerson()}
+                >
+                  {meLoading ? "Setting…" : "Set Me"}
+                </button>
+
+                {meError && (
+                  <div className="text-xs text-destructive">{meError}</div>
+                )}
+              </div>
+            </div>
+
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold">Tools</div>
               <div className="flex items-center gap-2">

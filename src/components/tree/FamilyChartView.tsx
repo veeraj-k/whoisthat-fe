@@ -130,6 +130,7 @@ type Props = {
   selectedB: string | null;
   onPersonClick: (personId: string) => void;
   familyId?: number;
+  mePerson?: PersonDto;
 };
 
 export type FamilyChartViewHandle = {
@@ -185,7 +186,10 @@ function layoutTree(nodes: Node[], edges: Edge[]): Node[] {
 }
 
 const FamilyChartViewComponent = forwardRef<FamilyChartViewHandle, Props>(
-  ({ persons, selectedA, selectedB, onPersonClick, familyId }, ref) => {
+  (
+    { persons, selectedA, selectedB, onPersonClick, familyId, mePerson },
+    ref,
+  ) => {
     const [nodes, setNodes] = useState<Node[]>([]);
     const [edges, setEdges] = useState<PositionedEdge[]>([]);
     const [serverPositions, setServerPositions] = useState<Array<{
@@ -297,6 +301,7 @@ const FamilyChartViewComponent = forwardRef<FamilyChartViewHandle, Props>(
               gender: p.gender,
               selectedA: selectedA === id,
               selectedB: selectedB === id,
+              isMe: mePerson?.id === p.id,
             },
           };
         });
@@ -443,7 +448,7 @@ const FamilyChartViewComponent = forwardRef<FamilyChartViewHandle, Props>(
 
       setNodes(nodesWithSavedPositions);
       setEdges(nextEdges);
-    }, [persons, selectedA, selectedB, layoutKey, serverPositions]);
+    }, [persons, selectedA, selectedB, layoutKey, serverPositions, mePerson]);
 
     const onNodesChange: OnNodesChange = (changes) =>
       setNodes((nds) => applyNodeChanges(changes, nds));

@@ -253,3 +253,19 @@ export function saveTreeLayout(
     body: JSON.stringify(body),
   });
 }
+
+export function getMePersonInFamily(familyId: number): Promise<PersonDto> {
+  return apiFetch<PersonDto>(`/api/v1/core/families/${familyId}/persons/me`);
+}
+
+export function setMePersonInFamily(
+  familyId: number,
+  personId: number,
+): Promise<PersonDto> {
+  return apiFetch<PersonDto>(
+    `/api/v1/core/families/${familyId}/persons/me/${personId}`,
+    {
+      method: "POST",
+    },
+  );
+}
