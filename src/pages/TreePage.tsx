@@ -222,6 +222,13 @@ export default function TreePage() {
     void loadMePerson();
   }, [load, loadFamilies, loadMePerson]);
 
+  // Auto-enable auto-decode when me person is set
+  useEffect(() => {
+    if (mePerson?.id) {
+      setAutoDecodeWithMe(true);
+    }
+  }, [mePerson?.id]);
+
   useEffect(() => {
     async function decodeRelation(a: string, b: string, lang: string) {
       const key = `${a}-${b}-${lang}`;
@@ -463,11 +470,11 @@ export default function TreePage() {
   return (
     <div className="min-h-[calc(100dvh-56px)] lg:h-[calc(100dvh-56px)]">
       {/* Family Navigation Header */}
-      <div className="border-b bg-card/60 backdrop-blur supports-backdrop-filter:bg-card/40">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-4">
+      <div className="border-b bg-card/60 backdrop-blur supports-backdrop-filter:bg-card/40 overflow-auto">
+        <div className="max-w-7xl mx-auto px-4 min-h-14 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-4 min-w-max">
             <button
-              className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+              className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent whitespace-nowrap"
               onClick={() => navigate("/")}
             >
               ← Back to Families
@@ -483,7 +490,7 @@ export default function TreePage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              className={`rounded-md px-3 py-1.5 text-sm ${
+              className={`rounded-md px-3 py-1.5 text-sm whitespace-nowrap ${
                 location.pathname === `/tree/${familyId}`
                   ? "bg-accent text-accent-foreground"
                   : "hover:bg-accent"
@@ -493,7 +500,7 @@ export default function TreePage() {
               Tree
             </button>
             <button
-              className={`rounded-md px-3 py-1.5 text-sm ${
+              className={`rounded-md px-3 py-1.5 text-sm whitespace-nowrap ${
                 location.pathname === `/relations`
                   ? "bg-accent text-accent-foreground"
                   : "hover:bg-accent"
@@ -504,7 +511,7 @@ export default function TreePage() {
             </button>
             {location.pathname === `/tree/${familyId}` && (
               <button
-                className="rounded-md bg-green-600 text-white px-3 py-1.5 text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-md bg-green-600 text-white px-3 py-1.5 text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 onClick={() => void saveLayout()}
                 disabled={isSavingLayout}
               >
